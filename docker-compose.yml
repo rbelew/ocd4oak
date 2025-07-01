@@ -1,0 +1,63 @@
+services:
+  webpack:
+    # Runs the webpack server for local development.
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: node
+    stdin_open: true
+    ports:
+      - 3000:3000
+    volumes:
+      - .:/app
+      - ocd4oak-node-modules:/app/node_modules
+    command: npm run serve
+
+  app:
+    image: o4o-emacs
+    container_name: emacs1
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    stdin_open: true
+    tty: true
+    ports:
+      - 8000:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ocd4oak-node-modules:/app/node_modules
+    environment:
+      # DJANGO_SECRET_KEY: reallysupersecret
+      DJANGO_MANAGEPY_MIGRATE: "on"
+      DJANGO_DEBUG: "True"
+      PGPASSWORD: postgres
+      
+    env_file:
+      - .env
+    entrypoint: /app/docker-entrypoint.sh
+    command: python manage.py runserver 0.0.0.0:8000
+
+  postgres:
+    container_name: ocd4oak-postgres
+    image: postgis/postgis
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ocd4oak
+    volumes:
+      - ocd4oak-db-data:/var/lib/postgresql/data
+    ports:
+      - 32001:5432
+
+volumes:
+  ocd4oak-db-data:
+  ocd4oak-node-modules:
